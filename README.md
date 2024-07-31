@@ -11,17 +11,20 @@ This plugin when installed will enable 2 commands:
 ## Photos of results
 
 ### Running
-![Running](https://imgur.com/ZKaGPj0)
+![Running](https://imgur.com/ZKaGPj0.png)
+
 An icon will be displayed at the beginning of running the commands (MavenTestAtCursor, MavenTestCurrentFile) to let you know that it has started.
 
 ### Success
-![Success](https://imgur.com/uHy96Ik)
+![Success](https://imgur.com/uHy96Ik.png)
+
 If the test passes the test this icon will be displayed and will show the notification
 
-![Notification](https://imgur.com/JWXZtex)
+![Notification](https://imgur.com/JWXZtex.png)
 
 ### Error
-![Error](https://imgur.com/fKZjM34)
+![Error](https://imgur.com/fKZjM34.png)
+
 If the test fails, this icon will be displayed and will show where the test failed.
 
-![Error Details](https://imgur.com/1et2Nxf)
+![Error Details](https://imgur.com/1et2Nxf.png)
