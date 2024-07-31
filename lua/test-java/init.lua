@@ -71,13 +71,7 @@ end
 
 -- Function to run Maven tests for the current file
 function M.run_current_file_tests()
-	local bufnr = vim.api.nvim_get_current_buf()
-	local test_functions = get_all_test_functions()
 	local current_file_name = vim.fn.expand("%:t:r")
-	local project_root = get_project_root()
-
-	-- Clear previous signs for the entire buffer before running tests
-	M.clear_signs(bufnr)
 
 	-- Check if the current file is a Java test file
 	if not vim.fn.expand("%:p"):match(".*%.java$") then
@@ -85,64 +79,11 @@ function M.run_current_file_tests()
 		return
 	end
 
-	local all_errors = {}
-	local errorMessage = ""
+	-- Command to run Maven tests for the current file using mvn
+	local cmd = "clear && mvn test -Dtest=" .. current_file_name
 
-	for _, test_func in ipairs(test_functions) do
-		local func_name = test_func.name
-		local line_num = test_func.line
-
-		-- Show running sign
-		show_signs(bufnr, line_num, "running")
-
-		-- Command to run Maven tests for each function using mvn
-		local cmd = {
-			"mvn",
-			"test",
-			"-q",
-			"-Dtest=" .. current_file_name .. "#" .. func_name,
-		}
-
-		-- Run the command asynchronously for each test function
-		vim.fn.jobstart(cmd, {
-			cwd = project_root,
-			stdout_buffered = true,
-			stderr_buffered = true,
-			on_stdout = function(_, data)
-				if data then
-					for _, line in ipairs(data) do
-						if line:match("^%[ERROR%]%s%s%s+") then
-							errorMessage = line
-						end
-					end
-				end
-			end,
-			on_stderr = function(_, data)
-				if data then
-					for _, line in ipairs(data) do
-						if line:match("^%[ERROR%]%s+") then
-							table.insert(all_errors, line)
-						end
-					end
-				end
-			end,
-			on_exit = function(_, exit_code)
-				-- Clear running sign before setting the final status
-				M.clear_signs(bufnr, line_num + 1)
-				if exit_code == 0 then
-					show_signs(bufnr, line_num, "success")
-					vim.api.nvim_echo({ { "Tests executed successfully", "SuccessMsg" } }, false, {})
-				else
-					show_signs(bufnr, line_num, "error")
-					if #all_errors > 0 then
-						vim.api.nvim_echo({ { table.concat(all_errors, "\n"), "ErrorMsg" } }, false, {})
-					else
-						vim.api.nvim_echo({ { errorMessage, "ErrorMsg" } }, false, {})
-					end
-				end
-			end,
-		})
-	end
+	-- Open terminal and execute command
+	vim.cmd("TermExec direction=float cmd='" .. cmd .. "'")
 end
 
 -- Function to run Maven test for the function under the cursor
