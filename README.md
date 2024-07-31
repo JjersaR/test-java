@@ -9,16 +9,19 @@ This plugin when installed will enable 2 commands:
 :MavenTestAtCursor --> This command will execute the test where the cursor is located.
 ```
 ## Photos of results
+
 ### Running
-![][https://imgur.com/ZKaGPj0]
+![Running](https://imgur.com/ZKaGPj0)
 An icon will be displayed at the beginning of running the commands (MavenTestAtCursor, MavenTestCurrentFile) to let you know that it has started.
 
 ### Success
-![][https://imgur.com/uHy96Ik]
+![Success](https://imgur.com/uHy96Ik)
 If the test passes the test this icon will be displayed and will show the notification
-![][https://imgur.com/JWXZtex]
+
+![Notification](https://imgur.com/JWXZtex)
 
 ### Error
-![][https://imgur.com/fKZjM34]
+![Error](https://imgur.com/fKZjM34)
 If the test fails, this icon will be displayed and will show where the test failed.
-![][https://imgur.com/1et2Nxf]
+
+![Error Details](https://imgur.com/1et2Nxf)
