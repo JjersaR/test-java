@@ -197,6 +197,26 @@ function M.setup()
 	vim.api.nvim_create_user_command("MavenTestAtCursorDetail", function()
 		M.run_test_at_cursor_details()
 	end, { nargs = 0 })
+
+	vim.api.nvim_set_keymap("n", "<Leader>t", "", { noremap = true, silent = true, desc = " Test" })
+	vim.api.nvim_set_keymap(
+		"n",
+		"<Leader>tm",
+		":lua require('test-java').run_test_at_cursor()<CR>",
+		{ noremap = true, silent = true, desc = " Test Method" }
+	)
+	vim.api.nvim_set_keymap(
+		"n",
+		"<Leader>tf",
+		":lua require('test-java').run_current_file_tests()<CR>",
+		{ noremap = true, silent = true, desc = " Test File" }
+	)
+	vim.api.nvim_set_keymap(
+		"n",
+		"<Leader>td",
+		":lua require('test-java').run_test_at_cursor_details()<CR>",
+		{ noremap = true, silent = true, desc = " Detail Test" }
+	)
 end
 
 return M
