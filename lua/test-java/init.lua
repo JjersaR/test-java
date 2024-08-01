@@ -8,6 +8,18 @@ vim.fn.sign_define("MavenTestSuccess", { text = "", texthl = "SuccessMsg", nu
 vim.fn.sign_define("MavenTestError", { text = "", texthl = "ErrorMsg", numhl = "" })
 vim.fn.sign_define("MavenTestRunning", { text = "", texthl = "WarningMsg", numhl = "" })
 
+-- Function to get the class name from the file
+local function get_class_name()
+	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+	for _, line in ipairs(lines) do
+		local class_name = line:match("^%s*public%s+class%s+([%w_]+)")
+		if class_name then
+			return class_name
+		end
+	end
+	return nil
+end
+
 -- Function to get the name and line of the current Java test function
 local function get_current_test_function()
 	local cursor_pos = vim.api.nvim_win_get_cursor(0)
@@ -149,6 +161,29 @@ function M.run_test_at_cursor()
 	})
 end
 
+-- Function to run Maven test for the function under the cursor details
+function M.run_test_at_cursor_details()
+	local class_name = get_class_name()
+	local current_function_name, _ = get_current_test_function()
+
+	-- Check if the current file is a Java test file
+	if not vim.fn.expand("%:p"):match(".*%.java$") then
+		print("This is not a Java file.")
+		return
+	end
+
+	if not current_function_name then
+		print("No test function found under the cursor.")
+		return
+	end
+
+	-- Command to run Maven tests for the current function using mvn
+	local cmd = "clear && mvn -q test -Dtest=" .. class_name .. "#" .. current_function_name
+
+	-- Open terminal and execute command
+	vim.cmd("TermExec direction=float cmd='" .. cmd .. "'")
+end
+
 -- Setup function to define the commands and key mappings
 function M.setup()
 	vim.api.nvim_create_user_command("MavenTestCurrentFile", function()
@@ -157,6 +192,10 @@ function M.setup()
 
 	vim.api.nvim_create_user_command("MavenTestAtCursor", function()
 		M.run_test_at_cursor()
+	end, { nargs = 0 })
+
+	vim.api.nvim_create_user_command("MavenTestAtCursorDetail", function()
+		M.run_test_at_cursor_details()
 	end, { nargs = 0 })
 end
 
