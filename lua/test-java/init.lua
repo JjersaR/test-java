@@ -26,13 +26,30 @@ local function get_current_test_function()
 	local line_num = cursor_pos[1]
 	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
-	for i = line_num, 1, -1 do
+	for i = line_num, #lines do
 		local func_name = lines[i]:match("^%s*[%w_%s]+%s+void%s+([%w_]+)%s*%(")
 		if func_name then
 			return func_name, i - 1 -- Return function name and line number (0-based)
 		end
 	end
 	return nil, nil
+end
+
+function M.get_class_and_method()
+	local class_name = get_class_name()
+	local method_name, _ = get_current_test_function()
+
+	if not class_name then
+		print("Class name not found.")
+		return nil, nil
+	end
+
+	if not method_name then
+		print("Method name not found.")
+		return nil, nil
+	end
+
+	return class_name, method_name
 end
 
 -- Function to clear previous signs for a specific line or the entire buffer
@@ -163,8 +180,12 @@ end
 
 -- Function to run Maven test for the function under the cursor details
 function M.run_test_at_cursor_details()
-	local class_name = get_class_name()
-	local current_function_name, _ = get_current_test_function()
+	local class_name, current_function_name = M.get_class_and_method()
+
+	if class_name == nil then
+		print("No class found.")
+		return
+	end
 
 	-- Check if the current file is a Java test file
 	if not vim.fn.expand("%:p"):match(".*%.java$") then
@@ -176,6 +197,10 @@ function M.run_test_at_cursor_details()
 		print("No test function found under the cursor.")
 		return
 	end
+
+	-- Remove any unwanted path from the class name and method name
+	class_name = class_name:match("([%w_]+)$") or class_name
+	current_function_name = current_function_name:match("([%w_]+)$") or current_function_name
 
 	-- Command to run Maven tests for the current function using mvn
 	local cmd = "clear && mvn -q test -Dtest=" .. class_name .. "#" .. current_function_name
