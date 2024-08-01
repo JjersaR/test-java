@@ -27,24 +27,11 @@ end
 function M.clear_signs(bufnr, line_num)
 	if line_num then
 		-- Clear signs only on the specified line
-		vim.fn.sign_unplace("test-java", { buffer = bufnr, lnum = line_num })
+		vim.api.nvim_buf_clear_namespace(bufnr, namespace_id, line_num, line_num + 1)
 	else
 		-- Clear all signs for the namespace in the buffer
-		vim.fn.sign_unplace("test-java", { buffer = bufnr })
+		vim.api.nvim_buf_clear_namespace(bufnr, namespace_id, 0, -1)
 	end
-end
-
--- Function to get the name and line of all Java test functions in the current file
-local function get_all_test_functions()
-	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-	local test_functions = {}
-	for i, line in ipairs(lines) do
-		local func_name = line:match("^%s*[%w_%s]+%s+void%s+([%w_]+)%s*%(")
-		if func_name then
-			table.insert(test_functions, { name = func_name, line = i - 1 }) -- Collect function name and line number (0-based)
-		end
-	end
-	return test_functions
 end
 
 -- Function to show signs (success, error or running) based on state
