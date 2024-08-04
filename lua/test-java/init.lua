@@ -35,18 +35,29 @@ local function get_current_test_function()
 	return nil, nil
 end
 
-function M.get_class_and_method()
-	local class_name = get_class_name()
-	local method_name, _ = get_current_test_function()
+local function get_class_and_method()
+	-- Obtener el buffer actual
+	local buf = vim.api.nvim_get_current_buf()
 
-	if not class_name then
-		print("Class name not found.")
-		return nil, nil
+	-- Obtener el contenido del buffer
+	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+
+	local class_name = ""
+	local method_name = ""
+
+	-- Buscar el nombre de la clase
+	for _, line in ipairs(lines) do
+		local class_match = line:match("public%s+class%s+(%w+)")
+		if class_match then
+			class_name = class_match
+			break
+		end
 	end
-
-	if not method_name then
-		print("Method name not found.")
-		return nil, nil
+	-- Buscar el nombre del método en la línea actual
+	local current_line = vim.api.nvim_get_current_line()
+	local method_match = current_line:match("void%s+(%w+)%s*%(")
+	if method_match then
+		method_name = method_match
 	end
 
 	return class_name, method_name
@@ -124,7 +135,6 @@ function M.run_test_at_cursor()
 	end
 
 	local all_errors = {}
-	local errorMessage = ""
 
 	-- Show running sign
 	show_signs(bufnr, line_num, "running")
@@ -137,53 +147,46 @@ function M.run_test_at_cursor()
 		"-Dtest=" .. current_file_name .. "#" .. current_function_name,
 	}
 
-	-- Run the command asynchronously
-	vim.fn.jobstart(cmd, {
-		cwd = project_root,
-		stdout_buffered = true,
-		stderr_buffered = true,
-		on_stdout = function(_, data)
-			if data then
-				for _, line in ipairs(data) do
-					if line:match("^%[ERROR%]%s%s%s+") then
-						errorMessage = line
-					end
+	-- Run the command asynchronously using vim.system
+	vim.system(cmd, { cwd = project_root }, function(obj)
+		local exit_code = obj.code
+		local stderr = obj.stderr
+
+		-- Ensure stderr is a string
+		if type(stderr) == "string" then
+			-- Process stderr to capture error messages
+			for _, line in ipairs(vim.split(stderr, "\n")) do
+				if
+					(line:match("expected%s*<") and line:match("but was%s*<"))
+					or (line:match("Wanted%s+[%d]+%s+times:") or line:match("But was%s+[%d]+%s+time:"))
+				then
+					table.insert(all_errors, line)
 				end
 			end
-		end,
-		on_stderr = function(_, data)
-			if data then
-				for _, line in ipairs(data) do
-					if line:match("^%[ERROR%]%s+") then
-						table.insert(all_errors, line)
-					end
-				end
-			end
-		end,
-		on_exit = function(_, exit_code)
-			-- Clear running sign before setting the final status
-			M.clear_signs(bufnr, line_num + 1)
-			if exit_code == 0 then
-				show_signs(bufnr, line_num, "success")
-				vim.api.nvim_echo({ { "Test executed successfully", "SuccessMsg" } }, false, {})
+		end
+
+		-- Clear running sign before setting the final status
+		M.clear_signs(bufnr, line_num + 1)
+		if exit_code == 0 then
+			show_signs(bufnr, line_num, "success")
+			vim.api.nvim_echo({ { "Test executed successfully", "SuccessMsg" } }, false, {})
+		else
+			show_signs(bufnr, line_num, "error")
+			if #all_errors > 0 then
+				vim.api.nvim_echo({ { table.concat(all_errors, "\n"), "ErrorMsg" } }, false, {})
 			else
-				show_signs(bufnr, line_num, "error")
-				if #all_errors > 0 then
-					vim.api.nvim_echo({ { table.concat(all_errors, "\n"), "ErrorMsg" } }, false, {})
-				else
-					vim.api.nvim_echo({ { errorMessage, "ErrorMsg" } }, false, {})
-				end
+				vim.api.nvim_echo({ { "Test failed", "ErrorMsg" } }, false, {})
 			end
-		end,
-	})
+		end
+	end)
 end
 
 -- Function to run Maven test for the function under the cursor details
 function M.run_test_at_cursor_details()
 	local class_name, current_function_name = M.get_class_and_method()
 
-	if class_name == nil then
-		print("No class found.")
+	if class_name == "" or current_function_name == "" then
+		print("The name of the class or method could not be obtained.")
 		return
 	end
 
@@ -193,20 +196,11 @@ function M.run_test_at_cursor_details()
 		return
 	end
 
-	if not current_function_name then
-		print("No test function found under the cursor.")
-		return
-	end
-
-	-- Remove any unwanted path from the class name and method name
-	class_name = class_name:match("([%w_]+)$") or class_name
-	current_function_name = current_function_name:match("([%w_]+)$") or current_function_name
-
 	-- Command to run Maven tests for the current function using mvn
-	local cmd = "clear && mvn -q test -Dtest=" .. class_name .. "#" .. current_function_name
+	local command = string.format("clear && mvn test -Dtest=%s#%s", class_name, current_function_name)
 
 	-- Open terminal and execute command
-	vim.cmd("TermExec direction=float cmd='" .. cmd .. "'")
+	vim.cmd("TermExec direction=float cmd='" .. command .. "'")
 end
 
 -- Setup function to define the commands and key mappings
