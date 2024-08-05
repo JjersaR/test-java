@@ -8,18 +8,6 @@ vim.fn.sign_define("MavenTestSuccess", { text = "", texthl = "SuccessMsg", nu
 vim.fn.sign_define("MavenTestError", { text = "", texthl = "ErrorMsg", numhl = "" })
 vim.fn.sign_define("MavenTestRunning", { text = "", texthl = "WarningMsg", numhl = "" })
 
--- Function to get the class name from the file
-local function get_class_name()
-	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-	for _, line in ipairs(lines) do
-		local class_name = line:match("^%s*public%s+class%s+([%w_]+)")
-		if class_name then
-			return class_name
-		end
-	end
-	return nil
-end
-
 -- Function to get the name and line of the current Java test function
 local function get_current_test_function()
 	local cursor_pos = vim.api.nvim_win_get_cursor(0)
@@ -35,7 +23,7 @@ local function get_current_test_function()
 	return nil, nil
 end
 
-local function get_class_and_method()
+function M.get_class_and_method()
 	-- Obtener el buffer actual
 	local buf = vim.api.nvim_get_current_buf()
 
@@ -119,27 +107,30 @@ function M.run_test_at_cursor()
 	local current_file_name = vim.fn.expand("%:t:r")
 	local current_function_name, line_num = get_current_test_function()
 	local project_root = get_project_root()
+	local all_errors = {}
 
-	-- Clear previous signs for the entire buffer before running the test
-	M.clear_signs(bufnr)
+	-- Limpiar signos previos para todo el buffer antes de ejecutar la prueba
+	vim.schedule(function()
+		M.clear_signs(bufnr)
+	end)
 
-	-- Check if the current file is a Java test file
+	-- Verificar si el archivo actual es un archivo de prueba Java
 	if not vim.fn.expand("%:p"):match(".*%.java$") then
 		print("This is not a Java file.")
 		return
 	end
 
 	if not current_function_name then
-		print("No test function found under the cursor.")
+		print("No test function was found under the cursor.")
 		return
 	end
 
-	local all_errors = {}
+	-- Mostrar signo de ejecución
+	vim.schedule(function()
+		show_signs(bufnr, line_num, "running")
+	end)
 
-	-- Show running sign
-	show_signs(bufnr, line_num, "running")
-
-	-- Command to run Maven tests for the current function using mvn
+	-- Comando para ejecutar pruebas de Maven en la función actual usando mvn
 	local cmd = {
 		"mvn",
 		"test",
@@ -147,37 +138,41 @@ function M.run_test_at_cursor()
 		"-Dtest=" .. current_file_name .. "#" .. current_function_name,
 	}
 
-	-- Run the command asynchronously using vim.system
+	-- Ejecutar el comando de manera asíncrona usando vim.system
 	vim.system(cmd, { cwd = project_root }, function(obj)
 		local exit_code = obj.code
-		local stderr = obj.stderr
+		local stdout = obj.stdout
 
-		-- Ensure stderr is a string
-		if type(stderr) == "string" then
-			-- Process stderr to capture error messages
-			for _, line in ipairs(vim.split(stderr, "\n")) do
-				if
-					(line:match("expected%s*<") and line:match("but was%s*<"))
-					or (line:match("Wanted%s+[%d]+%s+times:") or line:match("But was%s+[%d]+%s+time:"))
-				then
+		-- Asegurarse de que stderr sea una cadena
+		if type(stdout) == "string" then
+			-- Procesar stderr para capturar mensajes de error
+			for _, line in ipairs(vim.split(stdout, "\n")) do
+				print(line)
+				if line:match("^%[ERROR%]%s%s%s%S") and line:match("expected:%s<.*>%s*but was:%s<.*>") then
+					table.insert(all_errors, line)
+				elseif line:match("^Wanted%s[%d]+%stime[s]?[:]") then
+					table.insert(all_errors, line)
+				elseif line:match("^But%swas%s[%d]+%stime[s]?[:]") then
 					table.insert(all_errors, line)
 				end
 			end
 		end
 
-		-- Clear running sign before setting the final status
-		M.clear_signs(bufnr, line_num + 1)
-		if exit_code == 0 then
-			show_signs(bufnr, line_num, "success")
-			vim.api.nvim_echo({ { "Test executed successfully", "SuccessMsg" } }, false, {})
-		else
-			show_signs(bufnr, line_num, "error")
-			if #all_errors > 0 then
-				vim.api.nvim_echo({ { table.concat(all_errors, "\n"), "ErrorMsg" } }, false, {})
+		-- Limpiar signo de ejecución antes de establecer el estado final
+		vim.schedule(function()
+			M.clear_signs(bufnr, line_num + 1)
+			if exit_code == 0 then
+				show_signs(bufnr, line_num, "success")
+				vim.api.nvim_echo({ { "Test executed successfully", "SuccessMsg" } }, false, {})
 			else
-				vim.api.nvim_echo({ { "Test failed", "ErrorMsg" } }, false, {})
+				show_signs(bufnr, line_num, "error")
+				if #all_errors > 0 then
+					vim.api.nvim_echo({ { table.concat(all_errors, "\n"), "ErrorMsg" } }, false, {})
+				else
+					vim.api.nvim_echo({ { "Test failed", "ErrorMsg" } }, false, {})
+				end
 			end
-		end
+		end)
 	end)
 end
 
@@ -197,7 +192,7 @@ function M.run_test_at_cursor_details()
 	end
 
 	-- Command to run Maven tests for the current function using mvn
-	local command = string.format("clear && mvn test -Dtest=%s#%s", class_name, current_function_name)
+	local command = string.format("clear && mvn test -q -Dtest=%s#%s", class_name, current_function_name)
 
 	-- Open terminal and execute command
 	vim.cmd("TermExec direction=float cmd='" .. command .. "'")
